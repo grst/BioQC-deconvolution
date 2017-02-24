@@ -1,0 +1,132 @@
+---
+title: "simulate p-value distributions of BioQC"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(BioQC)
+```
+
+```{r}
+top = 10000:10100
+bg = 1:1000
+
+v = c(top, bg)
+sig1 = 1:100
+sig2 = 1:200
+
+wmwTest(v, sig1, valType="p.greater")
+wmwTest(v, sig2, valType="p.greater")
+
+```
+
+Some real-world data
+```{r}
+load("/pstore/data/biostats/users/sturmg/BioQC_GEO_analysis/gse_tissue_annot/geo_annot/GSE33828.Rdata")
+gse33828 = eset_res
+load("/pstore/data/biostats/users/sturmg/BioQC_GEO_analysis/gse_tissue_annot/geo_annot/GSE40773.Rdata")
+gse40773 = eset_res
+load("/pstore/data/biostats/users/sturmg/BioQC_GEO_analysis/gse_tissue_annot/geo_annot/GSE48152.Rdata")
+gse48152 = eset_res
+load("/pstore/data/biostats/users/sturmg/BioQC_GEO_analysis/gse_tissue_annot/geo_annot/GSE47199.Rdata")
+gse47199 = eset_res
+
+
+baseline_signatures = readGmt("../pygenesig/results/baseline_signatures.gmt")
+sig5000 = baseline_signatures$random_5000_1$genes
+```
+
+```{r}
+addNoise = function(matrix, fractionAffected=.1, stdv=2) {
+   noise = matrix(rnorm(nrow(matrix)*ncol(matrix), mean=20, sd=stdv), nrow=nrow(matrix), byrow=FALSE)
+   addNoise = matrix(runif(nrow(matrix)*ncol(matrix)), nrow=nrow(matrix), byrow=FALSE) < fractionAffected
+   matrix = matrix + addNoise*noise
+   return(matrix)
+ }
+
+```
+
+
+Simulation study on random data
+```{r}
+N_SAMP = 50
+N_GENES = 40000
+N_SIG = 2000
+N_GENES_PER_SIG = 10
+
+sample_mat = matrix(rlnorm(N_GENES * N_SAMP, mean=9, sd=2), N_GENES, N_SAMP)
+sample_mat = addNoise(sample_mat)
+
+sample_data = gse40773
+sample_data = sample_data[!is.na(fData(sample_data)$BioqcGeneSymbol),]
+sample_mat = exprs(sample_data)
+N_GENES = nrow(exprs(sample_data))
+
+sig_list10 = lapply(1:N_SIG, function(unused) {return(sample(1:(N_GENES), 10))})
+sig_list1000 = lapply(1:N_SIG, function(unused) {return(sample(1:(N_GENES), 1000))})
+sig_list_baseline = list(sig5000=fData(sample_data)$BioqcGeneSymbol %in% sig5000)
+
+bioqc_res_10 = data.table(melt(absLog10p(wmwTest(sample_mat, sig_list10, valType="p.greater"))))
+bioqc_res_1000 = data.table(melt(absLog10p(wmwTest(sample_mat, sig_list1000, valType="p.greater"))))
+bioqc_res_baseline = data.table(melt(absLog10p(wmwTest(sample_mat, sig_list_baseline, valType="p.greater"))))
+bioqc_res_10[,sl:="10"]
+bioqc_res_1000[,sl:="1000"]
+bioqc_res_baseline[,sl:="baseline"]
+res_molten = rbind(bioqc_res_10, bioqc_res_1000, bioqc_res_baseline, fill=TRUE)
+ggplot(res_molten, aes(x=value)) + geom_density(aes(color=sl))
+```
+
+
+
+```{r}
+do.test <- function(senseMat, tissueInd, test=t.test, alternative="greater") {
+   bgInds = setdiff(1:nrow(senseMat), tissueInd)
+   res = apply(senseMat, 2, function(col) {
+     gs = col[tissueInd]
+     bg = col[bgInds]
+     return(test(gs, bg, alternative=alternative)$p.value)
+   })
+   return(res)
+}
+
+pval10 = -log10(do.test(exprs(gse47199), sig_list10[[2]], test=t.test))
+pval1000 = -log10(do.test(exprs(gse47199), sig_list1000[[2]], test=t.test))
+ggplot(melt(rbind(pval10, pval1000)), aes(x=value)) + geom_density(aes(color=Var1))
+
+```
+
+Checking signature names
+```{r}
+bioqc_res = absLog10p(wmwTest(gse33828, baseline_signatures, valType="p.greater", col="BioqcGeneSymbol"))
+ggplot(melt(bioqc_res[c("random_5000_0","enzyme_goslim"),]), aes(x=value)) + geom_density(aes(color=Var1))
+```
+
+```{r}
+bioqc_res = absLog10p(wmwTest(gse40773, baseline_signatures, valType="p.greater", col="BioqcGeneSymbol"))
+ggplot(melt(bioqc_res[c("random_5000_0","enzyme_goslim"),]), aes(x=value)) + geom_density(aes(color=Var1))
+```
+
+```{r}
+i_weird = intersect(sig5000, fData(gse40773)$BioqcGeneSymbol)
+i_normal = intersect(sig5000, fData(gse33828)$BioqcGeneSymbol)
+
+
+```
+
+
+```{r}
+
+random_boxplot = function(a_sample, n) {
+  boxes = lapply(1:10, function(unused) {sample(a_sample, n)})
+  boxplot(boxes)
+}
+
+random_boxplot(exprs(gse33828[,1]), 10)
+
+
+```
+
+```{r}
+random_boxplot(exprs(gse40773[,1]), 10)
+```
