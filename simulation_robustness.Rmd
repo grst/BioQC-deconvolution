@@ -1,0 +1,70 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(BioQC)
+library(data.table)
+library(ggplot2)
+```
+
+
+```{r}
+N_SAMP = 20
+N_GENES = 20000
+N_SIG = 20
+
+sample_mat = matrix(rlnorm(N_GENES * N_SAMP, mean=9, sd=2), N_GENES, N_SAMP)
+sample_mat = addNoise(sample_mat)
+sig_list10 = lapply(1:N_SIG, function(unused) {return(sample(1:(N_GENES), 10))})
+sig_list1000 = lapply(1:N_SIG, function(unused) {return(sample(1:(N_GENES), 1000))})
+
+bioqc_res_10 = data.table(melt(absLog10p(wmwTest(sample_mat, sig_list10, valType="p.greater"))))
+bioqc_res_1000 = data.table(melt(absLog10p(wmwTest(sample_mat, sig_list1000, valType="p.greater"))))
+bioqc_res_10[,sl:="10"]
+bioqc_res_1000[,sl:="1000"]
+res_molten = rbind(bioqc_res_10, bioqc_res_1000, fill=TRUE)
+ggplot(res_molten, aes(x=value)) + geom_density(aes(color=sl))
+```
+
+
+```{r}
+do.test <- function(senseMat, tissueInd, test=t.test, alternative="greater") {
+   bgInds = setdiff(1:nrow(senseMat), tissueInd)
+   res = apply(senseMat, 2, function(col) {
+     gs = col[tissueInd]
+     bg = col[bgInds]
+     return(test(gs, bg, alternative=alternative)$p.value)
+   })
+   return(res)
+}
+
+t_res10 = data.table(melt(lapply(sig_list10, function(signature) {
+  absLog10p(do.test(sample_mat, signature, test=t.test))
+})))
+t_res1000 = data.table(melt(lapply(sig_list1000, function(signature) {
+  absLog10p(do.test(sample_mat, signature, test=t.test))
+})))
+t_res10[,sl:="10"]
+t_res1000[,sl:="1000"]
+res_molten = rbind(t_res10, t_res1000)
+ggplot(res_molten, aes(x=value)) + geom_density(aes(color=sl))
+
+```
+
+```{r}
+
+ks_res10 = data.table(melt(lapply(sig_list10, function(signature) {
+  absLog10p(do.test(sample_mat, signature, test=ks.test))
+})))
+ks_res1000 = data.table(melt(lapply(sig_list1000, function(signature) {
+  absLog10p(do.test(sample_mat, signature, test=ks.test))
+})))
+ks_res10[,sl:="10"]
+ks_res1000[,sl:="1000"]
+res_molten = rbind(ks_res10, ks_res1000)
+ggplot(res_molten, aes(x=value)) + geom_density(aes(color=sl))
+
+```
