@@ -3,14 +3,141 @@ title: "R Notebook"
 output: html_notebook
 ---
 
-This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
-
-Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
-
-```{r}
-plot(cars)
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(BioQC)
+library(data.table)
+library(ggplot2)
+library(assertthat)
+library(RColorBrewer)
+library(scales)
 ```
 
-Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+```{r}
+addNoise = function(matrix, fractionAffected=.1, stdv=2) {
+   noise = matrix(rnorm(nrow(matrix)*ncol(matrix), mean=20, sd=stdv), nrow=nrow(matrix), byrow=FALSE)
+   addNoise = matrix(runif(nrow(matrix)*ncol(matrix)), nrow=nrow(matrix), byrow=FALSE) < fractionAffected
+   matrix = matrix + addNoise*noise
+   return(matrix)
+}
+```
 
-When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+```{r}
+SIG_SIZE = 500
+OVERLAP = 250
+N_SIG = 100
+# N_SAMP = 100
+N_GENES = 20000
+sig_list_liver = lapply(1:N_SIG, function(unused) {return(sample(1:(N_GENES), SIG_SIZE))})
+sig_list_kidney = lapply(1:N_SIG, function(i) {return(sample(sig_list_liver[[i]], OVERLAP))})
+sig_list_kidney = lapply(1:N_SIG, function(i) {
+  return(c(sample((1:N_GENES)[-sig_list_liver[[i]]], SIG_SIZE-OVERLAP), sig_list_kidney[[i]]))
+})
+invisible(lapply(1:N_SIG, function(i) {
+  assert_that(length(intersect(sig_list_kidney[[i]], sig_list_liver[[i]])) == OVERLAP)
+}));
+
+# make random samples
+sample_mat = matrix(rlnorm(N_GENES * N_SAMP, mean=9, sd=2), N_GENES, N_SAMP)
+sample_mat_overexpressed = matrix(rlnorm(N_GENES * N_SAMP, mean=12, sd=2), N_GENES, N_SAMP)
+
+# make liver 'genes' overexpressed
+for(i in 1:N_SIG) {
+  sample_mat[sig_list_liver[[i]],i] = sample_mat_overexpressed[sig_list_liver[[i]],i]
+}
+
+bioqc_res_liver = data.table(melt(diag(absLog10p(wmwTest(sample_mat, sig_list_liver, valType="p.greater")))))
+bioqc_res_kidney = data.table(melt(diag(absLog10p(wmwTest(sample_mat, sig_list_kidney, valType="p.greater")))))
+bioqc_res_liver[,sl:="liver"]
+bioqc_res_kidney[,sl:="kidney"]
+res_molten = rbind(bioqc_res_liver, bioqc_res_kidney, fill=TRUE)
+ggplot(res_molten, aes(x=value)) + geom_density(aes(color=sl))
+```
+
+
+
+
+
+The 'expected pvalue' only depends on the overlap and the size of the overlapping signature (in this case, on the kidney signature and the overlap with the liver signatures. )
+
+In other words, the relation of the overlap to the signature. 
+
+We simulate two scencarios: 
+
+* worst-case: the overlap are the top ranking genes in the sample
+* average-case: not all genes in the liver signature are over-expressed. The overlap is a random subsample of the genes in the liver signature. 
+
+## worst-case
+
+```{r}
+SIG_SIZE = 50
+N_GENES = 20000
+
+bioqc_res = lapply(1:SIG_SIZE, function(overlap) {
+  sig_liver = 1:SIG_SIZE
+  sample = c(500:(500+overlap), rnorm(N_GENES-overlap, mean = 9, sd = 2))
+  return(absLog10p(wmwTest(sample, sig_liver)))
+})
+
+ggplot(melt(bioqc_res), aes(x=L1, y=value)) + geom_line()
+```
+
+    
+```{r}
+N_GENES = 40000
+overlap = seq(.01, .2, .01)
+names(overlap) = overlap
+sig_length  = seq(20, 1000, 20)
+names(sig_length) = sig_length
+
+
+bioqc_res = lapply(overlap, function(ol) {
+  lapply(sig_length, function(sl) {
+    sig_liver = 1:(ol*sl)
+    sample = c(500+sig_liver, rnorm(N_GENES-length(sig_liver), mean=9, sd=2))
+    return(absLog10p(wmwTest(sample, sig_liver)))
+  })
+})
+
+bioqc_res_melt = data.table(melt(bioqc_res))
+colnames(bioqc_res_melt) = c("pvalue", "sig_length", "percent_overlap")
+bioqc_res_melt[,sig_length:=factor(sig_length, levels=unique(as.character(sig_length)))]
+
+hm.palette <- colorRampPalette(rev(brewer.pal(11, 'Spectral')), space='Lab')  
+ggplot(bioqc_res_melt, aes(x=sig_length, y=percent_overlap)) + geom_tile(aes(fill=pvalue)) +   
+  scale_fill_gradientn(colours = hm.palette(100), limits=c(0, 30), oob=squish) 
+
+```
+
+
+## average case
+```{r}
+N_GENES = 20000
+FRACTION_OVEREXPRESSED = .5
+overlap = seq(.01, .2, .01)
+names(overlap) = overlap
+sig_length  = seq(20, 1000, 20)
+names(sig_length) = sig_length
+
+
+bioqc_res = lapply(overlap, function(ol) {
+  lapply(sig_length, function(sl) {
+    sig_liver = 1:(ol*sl)
+    sample = rnorm(N_GENES, mean=9, sd=2)
+    sample_oe = rnorm(N_GENES, mean=12, sd=2)
+    oe_inds = sample(sig_liver, floor(FRACTION_OVEREXPRESSED*length(sig_liver)))
+    sample[oe_inds] = sample_oe[oe_inds] 
+    return(absLog10p(wmwTest(sample, sig_liver)))
+  })
+})
+
+bioqc_res_melt = data.table(melt(bioqc_res))
+colnames(bioqc_res_melt) = c("pvalue", "sig_length", "percent_overlap")
+bioqc_res_melt[,sig_length:=factor(sig_length, levels=unique(as.character(sig_length)))]
+
+hm.palette <- colorRampPalette(rev(brewer.pal(11, 'Spectral')), space='Lab')  
+ggplot(bioqc_res_melt, aes(x=sig_length, y=percent_overlap)) + geom_tile(aes(fill=pvalue)) +   
+  scale_fill_gradientn(colours = hm.palette(100), limits=c(0, 30), oob=squish) 
+
+```

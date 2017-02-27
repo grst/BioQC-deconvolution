@@ -10,6 +10,14 @@ library(data.table)
 library(ggplot2)
 ```
 
+```{r}
+addNoise = function(matrix, fractionAffected=.1, stdv=2) {
+   noise = matrix(rnorm(nrow(matrix)*ncol(matrix), mean=20, sd=stdv), nrow=nrow(matrix), byrow=FALSE)
+   addNoise = matrix(runif(nrow(matrix)*ncol(matrix)), nrow=nrow(matrix), byrow=FALSE) < fractionAffected
+   matrix = matrix + addNoise*noise
+   return(matrix)
+}
+```
 
 ```{r}
 N_SAMP = 20
