@@ -1,6 +1,6 @@
 ---
-title: "simulate p-value distributions of BioQC"
-output: html_document
+title: "BioQC p-value distributions on real-world data. "
+output: html_notebook
 ---
 
 ```{r setup, include=FALSE}

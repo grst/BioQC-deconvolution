@@ -1,6 +1,6 @@
 ---
-title: "Untitled"
-output: html_document
+title: "How does the signature size influence the BioQC score? "
+output: html_notebook
 ---
 
 ```{r setup, include=FALSE}
@@ -23,6 +23,13 @@ addNoise = function(matrix, fractionAffected=.1, stdv=2) {
 N_SAMP = 50
 N_GENES = 20000
 N_SIG = 100
+```
+
+We generate a random gene expression matrix with `r N_SAMP` samples and `r N_GENES` Genes. 
+We generate `r N_SIG` different random signatures of length 10 and 1000 respectively. 
+The following figure shows the p-value distribution. 
+```{r}
+
 
 sample_mat = matrix(rlnorm(N_GENES * N_SAMP, mean=9, sd=2), N_GENES, N_SAMP)
 sample_mat = addNoise(sample_mat, stdv=15)
@@ -31,13 +38,16 @@ sig_list1000 = lapply(1:N_SIG, function(unused) {return(sample(1:(N_GENES), 1000
 
 bioqc_res_10 = data.table(melt(absLog10p(wmwTest(sample_mat, sig_list10, valType="p.greater"))))
 bioqc_res_1000 = data.table(melt(absLog10p(wmwTest(sample_mat, sig_list1000, valType="p.greater"))))
-bioqc_res_10[,sl:="10"]
-bioqc_res_1000[,sl:="1000"]
+invisible(bioqc_res_10[,sl:="10"])
+invisible(bioqc_res_1000[,sl:="1000"])
 res_molten = rbind(bioqc_res_10, bioqc_res_1000, fill=TRUE)
 ggplot(res_molten, aes(x=value)) + geom_density(aes(color=sl))
 ```
 
+It appears, that BioQC, or rather the Wilcoxon-Mann-Whitney test is robust over signature sizes. 
 
+## How does it look like for other statistical tests? 
+### t-test
 ```{r}
 do.test <- function(senseMat, tissueInd, test=t.test, alternative="greater") {
    bgInds = setdiff(1:nrow(senseMat), tissueInd)
@@ -55,13 +65,15 @@ t_res10 = data.table(melt(lapply(sig_list10, function(signature) {
 t_res1000 = data.table(melt(lapply(sig_list1000, function(signature) {
   absLog10p(do.test(sample_mat, signature, test=t.test))
 })))
-t_res10[,sl:="10"]
-t_res1000[,sl:="1000"]
+invisible(t_res10[,sl:="10"])
+invisible(t_res1000[,sl:="1000"])
 res_molten = rbind(t_res10, t_res1000)
 ggplot(res_molten, aes(x=value)) + geom_density(aes(color=sl))
 
 ```
 
+
+### KS-test
 ```{r}
 
 ks_res10 = data.table(melt(lapply(sig_list10, function(signature) {
@@ -70,8 +82,8 @@ ks_res10 = data.table(melt(lapply(sig_list10, function(signature) {
 ks_res1000 = data.table(melt(lapply(sig_list1000, function(signature) {
   absLog10p(do.test(sample_mat, signature, test=ks.test))
 })))
-ks_res10[,sl:="10"]
-ks_res1000[,sl:="1000"]
+invisible(ks_res10[,sl:="10"])
+invisible(ks_res1000[,sl:="1000"])
 res_molten = rbind(ks_res10, ks_res1000)
 ggplot(res_molten, aes(x=value)) + geom_density(aes(color=sl))
 
