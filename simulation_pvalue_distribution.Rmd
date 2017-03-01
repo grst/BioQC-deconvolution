@@ -9,57 +9,66 @@ library(BioQC)
 ```
 
 ```{r}
-top = 10000:10100
-bg = 1:1000
+addNoise = function(matrix, fractionAffected=.1, stdv=2) {
+   noise = matrix(rnorm(nrow(matrix)*ncol(matrix), mean=20, sd=stdv), nrow=nrow(matrix), byrow=FALSE)
+   addNoise = matrix(runif(nrow(matrix)*ncol(matrix)), nrow=nrow(matrix), byrow=FALSE) < fractionAffected
+   matrix = matrix + addNoise*noise
+   return(matrix)
+}
 
-v = c(top, bg)
-sig1 = 1:100
-sig2 = 1:200
-
-wmwTest(v, sig1, valType="p.greater")
-wmwTest(v, sig2, valType="p.greater")
+filter_eset = function(eset) {
+  gene_symbols = fData(eset)$BioqcGeneSymbol
+  # remove lines that have no gene set
+  eset = eset[(!is.na(gene_symbols)) & gene_symbols != '-',]
+  eset = eset[keepMaxStatRowInd(exprs(eset), fData(eset)$BioqcGeneSymbol, stat=median),]
+  return(eset)
+}
 
 ```
 
 Some real-world data
 ```{r}
+N_SAMP = 50
+N_GENES = 40000
+
+simulation = matrix(rlnorm(N_GENES * N_SAMP, mean=9, sd=2), N_GENES, N_SAMP)
+simulation = addNoise(simulation)
 load("/pstore/data/biostats/users/sturmg/BioQC_GEO_analysis/gse_tissue_annot/geo_annot/GSE33828.Rdata")
-gse33828 = eset_res
+gse33828 = filter_eset(eset_res)
 load("/pstore/data/biostats/users/sturmg/BioQC_GEO_analysis/gse_tissue_annot/geo_annot/GSE40773.Rdata")
-gse40773 = eset_res
+gse40773 = filter_eset(eset_res)
 load("/pstore/data/biostats/users/sturmg/BioQC_GEO_analysis/gse_tissue_annot/geo_annot/GSE48152.Rdata")
-gse48152 = eset_res
+gse48152 = filter_eset(eset_res)
 load("/pstore/data/biostats/users/sturmg/BioQC_GEO_analysis/gse_tissue_annot/geo_annot/GSE47199.Rdata")
-gse47199 = eset_res
+gse47199 = filter_eset(eset_res)
+load("/pstore/data/biostats/users/sturmg/BioQC_GEO_analysis/gse_tissue_annot/geo_annot/GSE68172.Rdata")
+gse68172 = filter_eset(eset_res)
+gse68172 = gse68172[fData(gse68172)$BioqcGeneSymbol %in% hgnc$symbol,]
+load("/pstore/data/biostats/users/sturmg/BioQC_GEO_analysis/gse_tissue_annot/geo_annot/GSE33580.Rdata")
+gse33580 = filter_eset(eset_res)
+gse33580 = gse33580[fData(gse33580)$BioqcGeneSymbol %in% hgnc$symbol,]
+
 
 
 baseline_signatures = readGmt("../pygenesig/results/baseline_signatures.gmt")
 sig5000 = baseline_signatures$random_5000_1$genes
 ```
 
-```{r}
-addNoise = function(matrix, fractionAffected=.1, stdv=2) {
-   noise = matrix(rnorm(nrow(matrix)*ncol(matrix), mean=20, sd=stdv), nrow=nrow(matrix), byrow=FALSE)
-   addNoise = matrix(runif(nrow(matrix)*ncol(matrix)), nrow=nrow(matrix), byrow=FALSE) < fractionAffected
-   matrix = matrix + addNoise*noise
-   return(matrix)
- }
 
+
+Checking signature names
+```{r}
+bioqc_res = absLog10p(wmwTest(gse33580, baseline_signatures, valType="p.greater", col="BioqcGeneSymbol"))
+ggplot(melt(bioqc_res[c("random_5000_0","random_5000_1", "random_2000_1", "random_100_1"),]), aes(x=value)) + geom_density(aes(color=Var1))
 ```
 
 
 Simulation study on random data
 ```{r}
-N_SAMP = 50
-N_GENES = 40000
 N_SIG = 2000
 N_GENES_PER_SIG = 10
 
-sample_mat = matrix(rlnorm(N_GENES * N_SAMP, mean=9, sd=2), N_GENES, N_SAMP)
-sample_mat = addNoise(sample_mat)
-
-sample_data = gse40773
-sample_data = sample_data[!is.na(fData(sample_data)$BioqcGeneSymbol),]
+sample_data = gse68172
 sample_mat = exprs(sample_data)
 N_GENES = nrow(exprs(sample_data))
 
@@ -79,6 +88,11 @@ ggplot(res_molten, aes(x=value)) + geom_density(aes(color=sl))
 
 
 
+
+
+
+
+
 ```{r}
 do.test <- function(senseMat, tissueInd, test=t.test, alternative="greater") {
    bgInds = setdiff(1:nrow(senseMat), tissueInd)
@@ -90,16 +104,10 @@ do.test <- function(senseMat, tissueInd, test=t.test, alternative="greater") {
    return(res)
 }
 
-pval10 = -log10(do.test(exprs(gse47199), sig_list10[[2]], test=t.test))
-pval1000 = -log10(do.test(exprs(gse47199), sig_list1000[[2]], test=t.test))
+pval10 = -log10(do.test(exprs(gse68172), sig_list10[[2]], test=t.test))
+pval1000 = -log10(do.test(exprs(gse68172), sig_list1000[[2]], test=t.test))
 ggplot(melt(rbind(pval10, pval1000)), aes(x=value)) + geom_density(aes(color=Var1))
 
-```
-
-Checking signature names
-```{r}
-bioqc_res = absLog10p(wmwTest(gse33828, baseline_signatures, valType="p.greater", col="BioqcGeneSymbol"))
-ggplot(melt(bioqc_res[c("random_5000_0","enzyme_goslim"),]), aes(x=value)) + geom_density(aes(color=Var1))
 ```
 
 ```{r}
@@ -128,5 +136,5 @@ random_boxplot(exprs(gse33828[,1]), 10)
 ```
 
 ```{r}
-random_boxplot(exprs(gse40773[,1]), 10)
+random_boxplot(exprs(gse68172[,1]), 1000)
 ```

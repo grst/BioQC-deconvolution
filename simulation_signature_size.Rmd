@@ -12,7 +12,7 @@ library(ggplot2)
 
 ```{r}
 addNoise = function(matrix, fractionAffected=.1, stdv=2) {
-   noise = matrix(rnorm(nrow(matrix)*ncol(matrix), mean=20, sd=stdv), nrow=nrow(matrix), byrow=FALSE)
+   noise = matrix(rnorm(nrow(matrix)*ncol(matrix), mean=9, sd=stdv), nrow=nrow(matrix), byrow=FALSE)
    addNoise = matrix(runif(nrow(matrix)*ncol(matrix)), nrow=nrow(matrix), byrow=FALSE) < fractionAffected
    matrix = matrix + addNoise*noise
    return(matrix)
@@ -20,12 +20,12 @@ addNoise = function(matrix, fractionAffected=.1, stdv=2) {
 ```
 
 ```{r}
-N_SAMP = 20
+N_SAMP = 50
 N_GENES = 20000
-N_SIG = 20
+N_SIG = 100
 
 sample_mat = matrix(rlnorm(N_GENES * N_SAMP, mean=9, sd=2), N_GENES, N_SAMP)
-sample_mat = addNoise(sample_mat)
+sample_mat = addNoise(sample_mat, stdv=15)
 sig_list10 = lapply(1:N_SIG, function(unused) {return(sample(1:(N_GENES), 10))})
 sig_list1000 = lapply(1:N_SIG, function(unused) {return(sample(1:(N_GENES), 1000))})
 
