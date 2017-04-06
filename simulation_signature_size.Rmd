@@ -44,7 +44,37 @@ res_molten = rbind(bioqc_res_10, bioqc_res_1000, fill=TRUE)
 ggplot(res_molten, aes(x=value)) + geom_density(aes(color=sl))
 ```
 
-It appears, that BioQC, or rather the Wilcoxon-Mann-Whitney test is robust over signature sizes. 
+What if the signatures occur towards the top of the list? 
+As expected, large signatures are more potent than small ones. 
+```{r}
+sample = 1:20000
+signature1 = c(1)
+signature10 = c(1:10)
+signature100 = c(1:100)
+
+p1 = -log10(wmwTest(sample, signature1, valType = "p.greater"))
+p10 = -log10(wmwTest(sample, signature10, valType = "p.greater"))
+p100 = -log10(wmwTest(sample, signature100, valType = "p.greater"))
+```
+
+## Signature positioning
+```{r}
+sample = 1:20000
+signature_0 = 1:101
+signature_25 = 4050:5050
+signature_50 = 9950:10050
+signature_75 = 14950:15050
+signature_75_10 = seq(14500, 15500, 10) # signature spread has no effect -> median could suffice as correction value
+signature_100 = 19900:20000
+
+wmwTest(sample, signature_0, valType = "p.greater")
+wmwTest(sample, signature_25, valType = "p.greater")
+wmwTest(sample, signature_50, valType = "p.greater")
+wmwTest(sample, signature_75, valType = "p.greater")
+wmwTest(sample, signature_75_10, valType = "p.greater")
+wmwTest(sample, signature_100, valType = "p.greater")
+
+```
 
 ## How does it look like for other statistical tests? 
 ### t-test
