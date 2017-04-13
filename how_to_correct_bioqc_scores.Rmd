@@ -1,0 +1,57 @@
+---
+title: "How to normalize BioQC scores"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+We have demonstrated, that given good signatures, BioQC is able to reliably and specifically detect tissue abundance in gene expression samples. However, up to now, the BioQC scores are not comparable. For example, a liver signature in a liver sample results in a BioQC score >100 whereas a pancreas signature in a pancreas samply only results in a score ~5. Therefore, relative quantification is unfeasible. 
+
+The maximum BioQC score is mainly influenced by two factors: 
+
+* the size of a signature: a large enriched signature will trigger a smaller p-value in the Wilcoxon-Mann-Whitney (WMW)-test thant a small enriched signature. 
+* the median rank of the signature genes: The WMW-test checks if the genes in the signature tend to be at the top of the ranked list of all genes. Therefore a signature which consists of genes that appear at the very front of that list (e.g. ranks 1-200 of 20000) will result in a smaller p-value thant a signature which consists of genes that appear a little further down the list (e.g. ranks 4000-4200 of 20000)
+
+We can address this by correcting for the two factors. 
+
+## correcting for signature size. 
+This is fairly simple. Instead of the p-value, we use the *rank-biserial correlation* $r$, the effect size of the WMW-test, as our score, which is defined as: 
+
+$$
+r = 1 - \frac{2U}{n_1 n_2}
+$$
+
+where $U$ is the statistic of the WMW-test and $n_1$ and $n_2$ are the sizes of sample 1 and 2 respectively. 
+
+## correction for rank of signature genes. 
+To address this, we first need to estimate the *signature median rank* (SMR) for each signature. To do so, we need a set of $n$ samples $S = \{S_1, \dots S_n\}$ with $m$ genes each that correspond to a given signature $K$. 
+
+Let $S_i$ be a sequence of gene expression values $\langle S_{i1}, \dots , S_{im}\rangle$ and $K \subset 1..m$ 
+
+We define the $\text{SMR}$ as the median of the ranks of the gene expression of all genes in $K$ in all samples $S$:
+
+$$
+\text{SMR} = \text{median}\left( \bigcup_{i \in 1..n, j \in K} \text{rk}(S_{ij})\right)
+$$
+with $\text{rk}(S_{ij})$ being the rank of gene $j$ in sample $i$. 
+
+
+To what extent the signature median rank (SMR) is consistent across platforms and species is yet to be determined, however preliminary results make it tempting to speculate that it is sufficiently consistent within NGS experiments and within microarray experiments. 
+
+Based on the SMR we define the *expected U statistic* $U_{\text{exp}}$ as
+
+$$
+U_{\text{exp}} = \text{SMR} * k - \frac{k(k+1)}{2}
+$$
+where $k$ is the number of genes in the $K$. 
+
+Based on $U_{\text{exp}}$ we define the *SMR-corrected rank-biserial correlation coefficient* $r_\text{corr}$ which takes both the SMR and the size of the signature into account: 
+
+$$
+r_{\text{corr}} = 1 - \frac{2(U - U_{\text{exp}})}{n_1 n_2} 
+$$
+
+
+
