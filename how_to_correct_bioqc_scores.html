@@ -148,10 +148,14 @@ r = 1 - \frac{2U}{n_1 n_2}
 <p><span class="math display">\[
 U_{\text{exp}} = \text{SMR} * k - \frac{k(k+1)}{2}
 \]</span> where <span class="math inline">\(k\)</span> is the number of genes in the <span class="math inline">\(K\)</span>.</p>
-<p>Based on <span class="math inline">\(U_{\text{exp}}\)</span> we define the <em>SMR corrected rank-biserial correlation coefficient</em> <span class="math inline">\(r_\text{corr}\)</span> which takes both the SMR and the size of the signature into account:</p>
+<p>Based on <span class="math inline">\(U_{\text{exp}}\)</span> we define the <em>SMR-corrected rank-biserial correlation coefficient</em> <span class="math inline">\(r_\text{corr}\)</span> which takes both the SMR and the size of the signature into account:</p>
 <p><span class="math display">\[
 r_{\text{corr}} = 1 - \frac{2(U - U_{\text{exp}})}{n_1 n_2} 
 \]</span></p>
+</div>
+<div id="overlapping-signature" class="section level2">
+<h2>Overlapping signature</h2>
+<p>A third point that we may have to think about are overlapping signatures. A simple solution/workaround would be to create mutually exclusive signatures.</p>
 </div>
 
 

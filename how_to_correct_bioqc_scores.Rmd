@@ -54,4 +54,6 @@ r_{\text{corr}} = 1 - \frac{2(U - U_{\text{exp}})}{n_1 n_2}
 $$
 
 
-
+## Overlapping signature
+A third point that we may have to think about are overlapping signatures.
+A simple solution/workaround would be to create mutually exclusive signatures. 
