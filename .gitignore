@@ -1,2 +1,6 @@
 .ipynb_checkpoints
 *.nb.html
+results
+data
+__pycache__
+*.pyc
