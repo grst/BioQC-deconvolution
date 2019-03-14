@@ -1,0 +1,33 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(stringr)
+```
+
+```{r}
+signatures = read_csv("../../BioQC_GEO_analysis_results/data/bioqc_geo_oracle_dump/BIOQC_SIGNATURES_DATA_TABLE.csv")
+bioqc_res = read_csv("../../BioQC_GEO_analysis_results/data/bioqc_geo_oracle_dump/BIOQC_RES_DATA_TABLE.csv")
+# arbitrary random signature
+```
+
+```{r}
+random_sigs = signatures %>% filter(str_detect(NAME, "random")) %>% select(ID, NAME, SOURCE) 
+
+random_res = bioqc_res %>% inner_join(random_sigs, c("SIGNATURE" = "ID")) 
+
+```
+
+```{r}
+ggplot(random_res, aes(x=PVALUE, color=NAME)) + geom_density()
+```
+
+```{r}
+ggplot(random_res, aes(x=PVALUE)) + geom_density()
+```
+
+
+The signatures are entirely random, nevertheless a signature can by chance contain genes that are enriched in a certain tissue..
